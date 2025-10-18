@@ -1,0 +1,135 @@
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
+
+const protectDir = path.join(__dirname, "../cache/protect/");
+if (!fs.existsSync(protectDir)) fs.mkdirSync(protectDir, { recursive: true });
+
+module.exports.config = {
+  name: "إعدادات",
+  version: "1.0",
+  credits: "محمد إدريس",
+  description: "إدارة إعدادات الحماية والأمان في الجروب بشكل أنيق",
+  role: 1
+};
+
+// تحميل بيانات الحماية للجروب
+function getProtectData(threadID) {
+  const filePath = path.join(protectDir, `${threadID}.json`);
+  if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath));
+  return {
+    active: false,
+    protectName: false,
+    protectImage: false,
+    protectNick: false,
+    name: "",
+    nicknames: {},
+    imageSrc: ""
+  };
+}
+
+module.exports.run = async ({ api, event }) => {
+  const threadID = event.threadID;
+  const messageID = event.messageID;
+  const protectData = getProtectData(threadID);
+
+  const status = (x) => (x ? "✅" : "❌");
+
+  const msg = `
+╭───『 ⚙️ إعدادات البوت 』───╮
+│
+│ 1️⃣ حماية اسم الجروب ${status(protectData.protectName)}
+│ 2️⃣ حماية صورة الجروب ${status(protectData.protectImage)}
+│ 3️⃣ حماية الكنيات ${status(protectData.protectNick)}
+│ 4️⃣ تفعيل / تعطيل النظام بالكامل ${status(protectData.active)}
+│
+╰────────────────────────╯
+💬 *رد برقم الإعداد الذي تريد تغييره*
+`;
+
+  const sent = await api.sendMessage(msg, threadID, messageID);
+
+  global.client.handleReply.push({
+    name: module.exports.config.name,
+    author: event.senderID,
+    messageID: sent.messageID,
+    type: "menu",
+    data: protectData
+  });
+};
+
+module.exports.handleReply = async ({ api, event, handleReply }) => {
+  if (event.senderID !== handleReply.author) return;
+  const threadID = event.threadID;
+  const choice = parseInt(event.body);
+  const protectData = handleReply.data;
+  const filePath = path.join(protectDir, `${threadID}.json`);
+
+  const toggle = (key) => (protectData[key] = !protectData[key]);
+
+  switch (choice) {
+    case 1:
+      toggle("protectName");
+      api.sendMessage("🛡️ تم تغيير حالة حماية الاسم.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    case 2:
+      toggle("protectImage");
+      api.sendMessage("🖼️ تم تغيير حالة حماية الصورة.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    case 3:
+      toggle("protectNick");
+      api.sendMessage("👤 تم تغيير حالة حماية الكنيات.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    case 4:
+      toggle("active");
+      api.sendMessage("⚙️ تم تغيير حالة النظام بالكامل.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    default:
+      api.sendMessage("❌ رقم غير صالح، حاول مرة أخرى.", threadID);
+  }
+};
+
+module.exports.handleReaction = async ({ api, event, handleReaction }) => {
+  if (event.userID !== handleReaction.author) return;
+  if (event.reaction !== "👍") return;
+
+  const threadID = event.threadID;
+  const filePath = path.join(protectDir, `${threadID}.json`);
+  const protectData = handleReaction.data;
+
+  fs.writeFileSync(filePath, JSON.stringify(protectData, null, 2));
+
+  api.sendMessage("✅ تم تحديث الإعدادات بنجاح!\nتم حفظ الإعدادات الجديدة تلقائيًا 🔒", threadID);
+};

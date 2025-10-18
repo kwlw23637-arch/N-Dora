@@ -12,12 +12,12 @@
     "allowInbox": true,
     "commandDisabled": [],
     "eventDisabled": [],
-    "BOTNAME": "☑️ Dora Bot ☑️",
+    "BOTNAME": "☑️ ميدوريا ☑️",
     "AMDIN_NAME": "𝐁𝐎𝐓",
     "FACEBOOK_ADMIN": "https://www.facebook.com/DoraYogiEXE",
     "PREFIX": ".",
     "ADMINBOT": [
-        "1000826831865134"
+        "61578680396074"
     ],
     "NDH": [
         ""
@@ -113,4 +113,5 @@
     "طقس": {
         "OPEN_WEATHER": "c4ef85b93982d6627681b056e24bd438"
     }
-}
+    }        "superWinBonus": 2,
+        "epicWi

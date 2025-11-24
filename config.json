@@ -12,12 +12,12 @@
     "allowInbox": true,
     "commandDisabled": [],
     "eventDisabled": [],
-    "BOTNAME": "☑️ Dora Bot ☑️",
+    "BOTNAME": "ميدوريا",
     "AMDIN_NAME": "𝐁𝐎𝐓",
     "FACEBOOK_ADMIN": "https://www.facebook.com/DoraYogiEXE",
     "PREFIX": ".",
     "ADMINBOT": [
-        "1000826831865134"
+        "61582197102454"
     ],
     "NDH": [
         ""
@@ -113,4 +113,254 @@
     "طقس": {
         "OPEN_WEATHER": "c4ef85b93982d6627681b056e24bd438"
     }
+    }import { search, download } from 'aptoide-scraper'
+
+let handler = async (m, { conn, text }) => {
+  if (!text) return conn.reply(m.chat, '📱 اكتب اسم التطبيق لتحميله.\n\nمثال:\n*.تطبيق2* Facebook', m)
+
+  try {
+    await conn.reply(m.chat, '⏳ جاري البحث عن التطبيق...', m)
+
+    // البحث عن التطبيق
+    let results = await search(text)
+    if (!results.length) return conn.reply(m.chat, '❌ لم يتم العثور على أي تطبيق بهذا الاسم.', m)
+
+    let app = await download(results[0].id) // أخذ أول نتيجة
+
+    // رسالة معلومات التطبيق
+    let info = `📦 *اسم التطبيق:* ${app.name}\n`
+    info += `📂 *Package:* ${app.package}\n`
+    info += `🗓 *آخر تحديث:* ${app.lastup}\n`
+    info += `⚖ *الحجم:* ${app.size}\n`
+
+    // إرسال صورة + المعلومات
+    await conn.sendFile(m.chat, app.icon, 'icon.jpg', info, m)
+
+    // فحص إذا الحجم ضخم جدًا
+    if (app.size.includes('GB') || app.size.replace(' MB', '') > 999) {
+      return conn.reply(m.chat, '🛑 الملف ضخم جدًا ولا يمكن إرساله هنا.', m)
+    }
+
+    // إرسال التطبيق كملف APK
+    await conn.sendMessage(
+      m.chat,
+      {
+        document: { url: app.dllink },
+        mimetype: 'application/vnd.android.package-archive',
+        fileName: `${app.name}.apk`
+      },
+      { quoted: m }
+    )
+
+    await conn.reply(m.chat, '✅ تم إرسال التطبيق بنجاح!', m)
+  } catch (err) {
+    console.error(err)
+    return conn.reply(m.chat, '⚠️ حدث خطأ أثناء محاولة تحميل التطبيق.', m)
+  }
 }
+
+handler.help = ['تطبيق2']
+handler.tags = ['downloader']
+handler.command = ['تطبيق2']
+handler.register = true
+
+export default handlerconst fs = require("fs");
+const path = require("path");
+const axios = require("axios");
+
+const protectDir = path.join(__dirname, "../cache/protect/");
+if (!fs.existsSync(protectDir)) fs.mkdirSync(protectDir, { recursive: true });
+
+module.exports.config = {
+  name: "إعدادات",
+  version: "1.0",
+  credits: "محمد إدريس",
+  description: "إدارة إعدادات الحماية والأمان في الجروب بشكل أنيق",
+  role: 1
+};
+
+// تحميل بيانات الحماية للجروب
+function getProtectData(threadID) {
+  const filePath = path.join(protectDir, `${threadID}.json`);
+  if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath));
+  return {
+    active: false,
+    protectName: false,
+    protectImage: false,
+    protectNick: false,
+    name: "",
+    nicknames: {},
+    imageSrc: ""
+  };
+}
+
+module.exports.run = async ({ api, event }) => {
+  const threadID = event.threadID;
+  const messageID = event.messageID;
+  const protectData = getProtectData(threadID);
+
+  const status = (x) => (x ? "✅" : "❌");
+
+  const msg = `
+╭───『 ⚙️ إعدادات البوت 』───╮
+│
+│ 1️⃣ حماية اسم الجروب ${status(protectData.protectName)}
+│ 2️⃣ حماية صورة الجروب ${status(protectData.protectImage)}
+│ 3️⃣ حماية الكنيات ${status(protectData.protectNick)}
+│ 4️⃣ تفعيل / تعطيل النظام بالكامل ${status(protectData.active)}
+│
+╰────────────────────────╯
+💬 *رد برقم الإعداد الذي تريد تغييره*
+`;
+
+  const sent = await api.sendMessage(msg, threadID, messageID);
+
+  global.client.handleReply.push({
+    name: module.exports.config.name,
+    author: event.senderID,
+    messageID: sent.messageID,
+    type: "menu",
+    data: protectData
+  });
+};
+
+module.exports.handleReply = async ({ api, event, handleReply }) => {
+  if (event.senderID !== handleReply.author) return;
+  const threadID = event.threadID;
+  const choice = parseInt(event.body);
+  const protectData = handleReply.data;
+  const filePath = path.join(protectDir, `${threadID}.json`);
+
+  const toggle = (key) => (protectData[key] = !protectData[key]);
+
+  switch (choice) {
+    case 1:
+      toggle("protectName");
+      api.sendMessage("🛡️ تم تغيير حالة حماية الاسم.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    case 2:
+      toggle("protectImage");
+      api.sendMessage("🖼️ تم تغيير حالة حماية الصورة.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    case 3:
+      toggle("protectNick");
+      api.sendMessage("👤 تم تغيير حالة حماية الكنيات.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    case 4:
+      toggle("active");
+      api.sendMessage("⚙️ تم تغيير حالة النظام بالكامل.\nاضغط 👍 لحفظ التغييرات.", threadID, (err, info) => {
+        global.client.handleReaction.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          data: protectData
+        });
+      });
+      break;
+
+    default:
+      api.sendMessage("❌ رقم غير صالح، حاول مرة أخرى.", threadID);
+  }
+};
+
+module.exports.handleReaction = async ({ api, event, handleReaction }) => {
+  if (event.userID !== handleReaction.author) return;
+  if (event.reaction !== "👍") return;
+
+  const threadID = event.threadID;
+  const filePath = path.join(protectDir, `${threadID}.json`);
+  const protectData = handleReaction.data;
+
+  fs.writeFileSync(filePath, JSON.stringify(protectData, null, 2));
+
+  api.sendMessage("✅ تم تحديث الإعدادات بنجاح!\nتم حفظ الإعدادات الجديدة تلقائيًا 🔒", threadID);
+};‫╮─── ⋅ ⋅ ── ☾ ── ⋅ ⋅ ───╭
+‫ ◆ ◈  قـــائــمــة الاوامـــر ◆ ◈ 
+‫╯─── ⋅ ⋅ ── ☾ ── ⋅ ⋅ ───╰
+
+‫╮─⟪ الــمـطـور ⟫
+‫│   shell
+‫╯───────────⋅ ⋅
+
+‫╮─⟪ زكـــــــاء ⟫
+‫│   تحدث  ○   اريا  ○   ديبسك
+‫│   عدل  ○   جبلي  ○   تخيل
+‫│   تخيل2  ○   جبتي  ○   جي
+‫│   مشة
+‫╯───────────⋅ ⋅
+
+‫╮─⟪ الامــوال ⟫
+‫│   رصيد  ○   يومية  ○   حصاد
+‫│   جدادة  ○   القمة  ○   نبات
+‫│   بوكيمون  ○   جمع  ○   تحويل
+‫│   عمل  ○   سبان  ○   اعتقال
+‫│   اعلان  ○   منشور  ○   زواج
+‫│   زوجني  ○   عناق  ○   بوسه
+‫╯───────────⋅ ⋅
+
+‫╮─⟪ الــعــاب ⟫
+‫│   اعلام  ○   ايموجي  ○   تجميع
+‫│   حزورة  ○   شخصيات  ○   عكس
+‫│   عواصم
+‫╯───────────⋅ ⋅
+
+‫╮─⟪ عــامــة ⟫
+‫│   اختار  ○   بحث  ○   كلمات
+‫│   بروفايل  ○   رانك  ○   سيم
+‫│   خط  ○   مهام  ○   ترجم
+‫│   قول  ○   ابتايم  ○   الطقس
+‫│   اصفع  ○   افك  ○   الاوامر
+‫│   ايدي  ○   بيكاتشو  ○   تعلم
+‫│   حب  ○   دريك  ○   ردود
+‫│   سجن  ○   للا-يغتفر  ○   ليفو
+‫│   مطلوب  ○   مميز
+‫╯───────────⋅ ⋅
+
+‫╮─⟪ الــمـجــمـوعــة ⟫
+‫│   ملاحظه  ○   قواعد  ○   الدعم
+‫│   حذف
+‫╯───────────⋅ ⋅
+
+‫╮─⟪ وســائــط ⟫
+‫│   بلو  ○   طفل  ○   غلاف
+‫│   صور  ○   شوتي  ○   اغنية
+‫│   تيكتوك  ○   فيديو  ○   شخصية
+‫╯───────────⋅ ⋅
+
+‫╮─⟪ مــعــدات ⟫
+‫│   ازالة  ○   تلوين  ○   خطوط
+‫│   رفع  ○   مهمل  ○   تحسين
+‫│   استعادة  ○   بريد  ○   بارت
+‫╯───────────⋅ ⋅
+
+‫╮─── ⋅ ⋅ ── ☾ ── ⋅ ⋅ ───╭
+‫ › إجمالي الأوامر: 84
+‫ › اسـم الـبـوت:  لَيَفُآيَ ۦٰ٭ ۦٰ٭
+‫ › الـمـطـور:  فُـکْيِّ بًلَ أّلَبًدٍيِّلَ ۦٰ٭ ۦٰ٭
+‫ › استخـدم: `/اوامر [اسم الأمر]`
+‫   لعرض تفاصيل أي أمر
+‫╯─── ⋅ ⋅ ── ☾ ── ⋅ ⋅ ───╰
